@@ -9,7 +9,10 @@ import (
 	"os"
 )
 
-var filePath string
+var (
+	filePath string
+	count    int
+)
 
 var Command = &cobra.Command{
 	Use:   "run",
@@ -27,10 +30,17 @@ func init() {
 		"",
 		"Path to the file that contains questions",
 	)
+	Command.PersistentFlags().IntVarP(
+		&count,
+		"count",
+		"c",
+		0,
+		"Number of questions",
+	)
 }
 
 func runCommand() error {
-	session, err := storage.GetQuizSession(filePath)
+	session, err := storage.GetQuizSession(filePath, count)
 
 	if err != nil {
 		return err

@@ -12,7 +12,7 @@ const (
 	answerPart   = 2
 )
 
-func GetQuizSession(filePath string) (model.QuizSession, error) {
+func GetQuizSession(filePath string, count int) (model.QuizSession, error) {
 	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
 
 	if err != nil {
@@ -29,8 +29,16 @@ func GetQuizSession(filePath string) (model.QuizSession, error) {
 		return model.QuizSession{}, err
 	}
 
-	session := model.QuizSession{
-		Items: items,
+	var session model.QuizSession
+
+	if count < 1 || len(items) < count {
+		session = model.QuizSession{
+			Items: items,
+		}
+	} else {
+		session = model.QuizSession{
+			Items: items[:count],
+		}
 	}
 
 	return session, nil
