@@ -12,36 +12,18 @@ const (
 	answerPart   = 2
 )
 
-func GetQuizSession(filePath string, count int) (model.QuizSession, error) {
+func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
 
 	if err != nil {
-		return model.QuizSession{}, err
+		return nil, err
 	}
 
 	defer func() {
 		_ = file.Close()
 	}()
 
-	items, err := extractQuizItems(file)
-
-	if err != nil {
-		return model.QuizSession{}, err
-	}
-
-	var session model.QuizSession
-
-	if count < 1 || len(items) < count {
-		session = model.QuizSession{
-			Items: items,
-		}
-	} else {
-		session = model.QuizSession{
-			Items: items[:count],
-		}
-	}
-
-	return session, nil
+	return extractQuizItems(file)
 }
 
 func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {

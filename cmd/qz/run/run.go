@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/vlostech/qz/internal/model"
+	"github.com/vlostech/qz/internal/random"
 	"github.com/vlostech/qz/internal/storage"
 	"os"
 )
@@ -40,10 +41,31 @@ func init() {
 }
 
 func runCommand() error {
-	session, err := storage.GetQuizSession(filePath, count)
+	items, err := storage.GetQuizItems(filePath)
 
 	if err != nil {
 		return err
+	}
+
+	if count <= 0 {
+		count = len(items)
+	}
+
+	indexes := make([]int, len(items))
+
+	for i := range len(items) {
+		indexes[i] = i
+	}
+
+	randomIndexes := random.Randomize(indexes, count)
+	randomItems := make([]model.QuizSessionItem, len(randomIndexes))
+
+	for i, idx := range randomIndexes {
+		randomItems[i] = items[idx]
+	}
+
+	session := model.QuizSession{
+		Items: randomItems,
 	}
 
 	runFirstPhase(&session)
