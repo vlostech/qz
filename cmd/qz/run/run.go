@@ -6,13 +6,15 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vlostech/qz/internal/model"
 	"github.com/vlostech/qz/internal/random"
+	"github.com/vlostech/qz/internal/ranges"
 	"github.com/vlostech/qz/internal/storage"
 	"os"
 )
 
 var (
-	filePath string
-	count    int
+	filePath    string
+	count       int
+	rangeString string
 )
 
 var Command = &cobra.Command{
@@ -38,6 +40,13 @@ func init() {
 		0,
 		"Number of questions",
 	)
+	Command.PersistentFlags().StringVarP(
+		&rangeString,
+		"range",
+		"r",
+		"",
+		"Range of questions",
+	)
 }
 
 func runCommand() error {
@@ -47,14 +56,24 @@ func runCommand() error {
 		return err
 	}
 
-	if count <= 0 {
-		count = len(items)
+	var indexes []int
+
+	if rangeString != "" {
+		indexes, err = ranges.ParseRange(rangeString, len(items))
+
+		if err != nil {
+			return err
+		}
+	} else {
+		indexes = make([]int, len(items))
+
+		for i := range len(items) {
+			indexes[i] = i
+		}
 	}
 
-	indexes := make([]int, len(items))
-
-	for i := range len(items) {
-		indexes[i] = i
+	if count <= 0 {
+		count = len(items)
 	}
 
 	randomIndexes := random.Randomize(indexes, count)
