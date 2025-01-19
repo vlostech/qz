@@ -2,49 +2,40 @@ package ranges
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 )
 
-func ParseRange(rangeStr string, count int) ([]int, error) {
-	if count < 0 {
-		return nil, fmt.Errorf("count cannot be less than 0")
-	}
-
+func ParseRange(rangeStr string) (RangeQuery, error) {
 	if rangeStr == "" {
 		rangeStr = ".."
 	}
 
 	parts := strings.Split(rangeStr, ",")
+	rangeParts := make([][2]int, len(parts))
 
-	var questionIndexes []int
-
-	for _, part := range parts {
-		partIndexes, err := parseRangePart(part, count)
+	for i, part := range parts {
+		rangePart, err := parseRangePart(part)
 
 		if err != nil {
-			return nil, err
+			return RangeQuery{}, err
 		}
 
-		questionIndexes = append(questionIndexes, partIndexes...)
+		rangeParts[i] = rangePart
 	}
 
-	slices.Sort(questionIndexes)
-	output := slices.Compact(questionIndexes)
+	outputRange, err := buildRange(rangeParts)
 
-	return output, nil
+	if err != nil {
+		return RangeQuery{}, err
+	}
+
+	return outputRange, nil
 }
 
-func parseRangePart(partString string, count int) ([]int, error) {
+func parseRangePart(partString string) ([2]int, error) {
 	if partString == ".." {
-		indexes := make([]int, count)
-
-		for i := range indexes {
-			indexes[i] = i
-		}
-
-		return indexes, nil
+		return [2]int{0, -1}, nil
 	}
 
 	if strings.HasPrefix(partString, "..") {
@@ -52,20 +43,10 @@ func parseRangePart(partString string, count int) ([]int, error) {
 		closeIndex, err := getValue(numberString)
 
 		if err != nil {
-			return nil, err
+			return [2]int{}, err
 		}
 
-		if closeIndex > count {
-			closeIndex = count
-		}
-
-		indexes := make([]int, closeIndex)
-
-		for i := range indexes {
-			indexes[i] = i
-		}
-
-		return indexes, nil
+		return [2]int{0, closeIndex}, nil
 	}
 
 	if strings.HasSuffix(partString, "..") {
@@ -73,22 +54,10 @@ func parseRangePart(partString string, count int) ([]int, error) {
 		openIndex, err := getValue(numberString)
 
 		if err != nil {
-			return nil, err
+			return [2]int{}, err
 		}
 
-		if openIndex >= count {
-			return []int{}, nil
-		}
-
-		updatedCount := count - openIndex
-
-		indexes := make([]int, updatedCount)
-
-		for i := range updatedCount {
-			indexes[i] = openIndex + i
-		}
-
-		return indexes, nil
+		return [2]int{openIndex, -1}, nil
 	}
 
 	if strings.Contains(partString, "..") {
@@ -97,49 +66,25 @@ func parseRangePart(partString string, count int) ([]int, error) {
 		openIndex, err := getValue(numberStrings[0])
 
 		if err != nil {
-			return nil, err
+			return [2]int{}, err
 		}
 
 		closeIndex, err := getValue(numberStrings[1])
 
 		if err != nil {
-			return nil, err
+			return [2]int{}, err
 		}
 
-		if openIndex >= closeIndex {
-			return []int{}, nil
-		}
-
-		if openIndex >= count {
-			return []int{}, nil
-		}
-
-		if closeIndex > count {
-			closeIndex = count
-		}
-
-		questionCount := closeIndex - openIndex
-
-		indexes := make([]int, questionCount)
-
-		for i := range questionCount {
-			indexes[i] = openIndex + i
-		}
-
-		return indexes, nil
+		return [2]int{openIndex, closeIndex}, nil
 	}
 
 	index, err := getValue(partString)
 
 	if err != nil {
-		return nil, err
+		return [2]int{}, err
 	}
 
-	if index >= count {
-		return []int{}, nil
-	}
-
-	return []int{index}, nil
+	return [2]int{index, index}, nil
 }
 
 func getValue(str string) (int, error) {
@@ -154,4 +99,91 @@ func getValue(str string) (int, error) {
 	}
 
 	return val, nil
+}
+
+func buildRange(parts [][2]int) (RangeQuery, error) {
+	buf := make([][2]int, len(parts))
+	copy(buf, parts)
+
+	shouldRepeat := true
+
+	for shouldRepeat {
+		shouldRepeat = false
+
+		for i := 0; i+1 < len(buf); i++ {
+			for j := i + 1; j < len(buf); j++ {
+				mergeResult := tryMerge(buf[i], buf[j])
+
+				if len(mergeResult) == 1 {
+					buf[i] = mergeResult[0]
+					buf[j] = buf[len(buf)-1]
+					buf = buf[:len(buf)-1]
+					shouldRepeat = true
+				}
+			}
+		}
+	}
+
+	rangeQuery := RangeQuery{
+		Parts: make([]RangeQueryPart, len(buf)),
+	}
+
+	for i, r := range buf {
+		rangeQuery.Parts[i] = RangeQueryPart{
+			OpenIndex:  r[0],
+			CloseIndex: r[1],
+		}
+	}
+
+	return rangeQuery, nil
+}
+
+func tryMerge(first, second [2]int) [][2]int {
+	if !shouldMerge(first, second) {
+		return [][2]int{first, second}
+	}
+
+	var minLeft int
+	var maxRight int
+
+	if first[0] < second[0] {
+		minLeft = first[0]
+	} else {
+		minLeft = second[0]
+	}
+
+	if first[1] == -1 || second[1] == -1 {
+		maxRight = -1
+	} else if first[1] > second[1] {
+		maxRight = first[1]
+	} else {
+		maxRight = second[1]
+	}
+
+	if first[0] == first[1] && second[0] == second[1] {
+		return [][2]int{{minLeft, maxRight + 1}}
+	} else if first[0] == first[1] && first[0] == maxRight {
+		return [][2]int{{minLeft, maxRight + 1}}
+	} else if second[0] == second[1] && second[0] == maxRight {
+		return [][2]int{{minLeft, maxRight + 1}}
+	}
+
+	return [][2]int{{minLeft, maxRight}}
+}
+
+func shouldMerge(first, second [2]int) bool {
+	if first[0] == first[1] && second[0] == second[1] {
+		delta := first[0] - second[0]
+		return delta >= -1 && delta <= 1
+	}
+
+	if first[1] == -1 || first[1] >= second[0] {
+		if second[1] == -1 || first[0] <= second[1] {
+			return true
+		} else {
+			return false
+		}
+	} else {
+		return false
+	}
 }
