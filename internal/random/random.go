@@ -2,6 +2,7 @@ package random
 
 import "math/rand"
 
+// Randomize returns count numbers from nums in random order.
 func Randomize(nums []int, count int) []int {
 	lastIndex := len(nums) - 1
 	leftIndexes := nums

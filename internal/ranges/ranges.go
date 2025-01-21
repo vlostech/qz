@@ -6,6 +6,28 @@ import (
 	"strings"
 )
 
+// ParseRange parses a given string and converts it into RangeQuery model.
+//
+// Supported patterns:
+//
+//	".."    - All elements.
+//	"5"     - Element by index 5.
+//	"..5"   - From 0 to 5 (exclusively).
+//	"5.."   - From 5 to the end.
+//	"5..10" - From 5 to 10 (exclusively).
+//
+// ParseRange supports multiple ranges that are separated by ',' (comma). If two ranges overlap each other, they will
+// be merged.
+//
+// Example:
+//
+//	"..10,5..20,15.." -> ".."
+//
+//	Explanation:
+//	- "..10" and "5..20" has common elements (5, 6, ..., 9) and will be merged into "..20".
+//	- "..20" and "15.." also has common elements (15, 16, ..., 19) and will be merged into "..".
+//
+// An empty string ("") is interpreted as "..".
 func ParseRange(rangeStr string) (RangeQuery, error) {
 	if rangeStr == "" {
 		rangeStr = ".."

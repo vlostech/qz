@@ -7,6 +7,7 @@ import (
 	"github.com/vlostech/qz/internal/storage"
 )
 
+// CreateSession creates a new session with random questions.
 func CreateSession(
 	filePath string,
 	count int,
