@@ -1,13 +1,12 @@
 package run
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/vlostech/qz/internal/ioext"
 	"github.com/vlostech/qz/internal/model"
 	"github.com/vlostech/qz/internal/ranges"
 	"github.com/vlostech/qz/internal/session"
-	"os"
 )
 
 var (
@@ -61,15 +60,22 @@ func runCommand() error {
 		return err
 	}
 
-	runFirstPhase(s)
-	runSecondPhase(s)
+	err = runFirstPhase(s)
+
+	if err != nil {
+		return err
+	}
+
+	err = runSecondPhase(s)
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func runFirstPhase(session *model.QuizSession) {
-	scanner := bufio.NewScanner(os.Stdin)
-
+func runFirstPhase(session *model.QuizSession) error {
 	fmt.Println("PHASE 1 - QUESTIONS")
 	fmt.Println()
 
@@ -80,14 +86,21 @@ func runFirstPhase(session *model.QuizSession) {
 		fmt.Println()
 		fmt.Println("Write your answer:")
 
-		scanner.Scan()
-		session.Items[i].ActualAnswer = scanner.Text()
+		answer, err := ioext.GetMultilineString()
+
+		if err != nil {
+			return err
+		}
+
+		session.Items[i].ActualAnswer = answer
 
 		fmt.Println()
 	}
+
+	return nil
 }
 
-func runSecondPhase(session *model.QuizSession) {
+func runSecondPhase(session *model.QuizSession) error {
 	fmt.Println("PHASE 2 - ANSWERS")
 	fmt.Println()
 
@@ -104,6 +117,13 @@ func runSecondPhase(session *model.QuizSession) {
 		fmt.Println(session.Items[i].ActualAnswer)
 		fmt.Println()
 		fmt.Println("Press Enter to continue...")
-		_, _ = fmt.Scanln()
+
+		_, err := fmt.Scanln()
+
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
