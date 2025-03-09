@@ -45,3 +45,22 @@ qz run -f ~/test.txt -c 10 -r ..10,15,20,30..40,50..
 ```
 
 If `test.txt` contains 100 questions, the example above takes 72 questions and runs a session with 10 random questions.
+
+## Input
+
+When answering a question, you can use `\` character at the end of a line to add another line.
+
+```
+> First row\
+> Second row\
+> Last row
+```
+
+You can also use `\end` command at the beginning of a line to discard the current line.
+
+```
+> First row\
+> Second row\
+> Last row\
+> \end
+```
