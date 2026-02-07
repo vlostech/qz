@@ -2,9 +2,13 @@ package storage
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/vlostech/qz/internal/model"
 	"io"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 )
 
 const (
@@ -42,6 +46,44 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 	}()
 
 	return extractQuizItems(file)
+}
+
+// SaveQuizItems saves questions to the given file. If the file does not exist, it will be created. If the file already
+// exists, questions will be added to the end of the file.
+func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) error {
+	p, err := getAbsolutePath(filePath)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	defer func() {
+		closeErr := file.Close()
+		if closeErr != nil {
+			fmt.Printf("Error while closing file %s: %v\n", file.Name(), closeErr)
+		}
+	}()
+
+	if err != nil {
+		return err
+	}
+
+	builder := strings.Builder{}
+
+	for _, quizItem := range quizItems {
+		builder.WriteString(quizItem.Question)
+		builder.WriteString("\n\n")
+		builder.WriteString(quizItem.ExpectedAnswer)
+		builder.WriteString("\n\n")
+	}
+
+	_, err = file.Write([]byte(builder.String()))
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
@@ -106,4 +148,23 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 	quizItems = append(quizItems, *curQuizItem)
 
 	return quizItems, nil
+}
+
+func getAbsolutePath(filePath string) (string, error) {
+	if filepath.IsAbs(filePath) {
+		return filePath, nil
+	}
+
+	if strings.HasPrefix(filePath, fmt.Sprintf("~%c", os.PathSeparator)) {
+		homeDir, err := os.UserHomeDir()
+
+		if err != nil {
+			return "", err
+		}
+
+		absPath := path.Join(homeDir, filePath[2:])
+		return absPath, nil
+	}
+
+	return filepath.Abs(filePath)
 }

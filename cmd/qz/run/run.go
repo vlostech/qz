@@ -1,12 +1,17 @@
 package run
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/vlostech/qz/internal/ioext"
 	"github.com/vlostech/qz/internal/model"
 	"github.com/vlostech/qz/internal/ranges"
 	"github.com/vlostech/qz/internal/session"
+	"github.com/vlostech/qz/internal/storage"
 )
 
 var (
@@ -72,7 +77,7 @@ func runCommand() error {
 		return err
 	}
 
-	return nil
+	return runSavePhase(s)
 }
 
 func runFirstPhase(session *model.QuizSession) error {
@@ -104,6 +109,8 @@ func runSecondPhase(session *model.QuizSession) error {
 	fmt.Println("PHASE 2 - ANSWERS")
 	fmt.Println()
 
+	scanner := bufio.NewScanner(os.Stdin)
+
 	for i := 0; i < len(session.Items); i++ {
 		fmt.Printf("%v/%v\n", i+1, len(session.Items))
 		fmt.Println()
@@ -118,12 +125,219 @@ func runSecondPhase(session *model.QuizSession) error {
 		fmt.Println()
 		fmt.Println("Press Enter to continue...")
 
-		_, err := fmt.Scanln()
-
-		if err != nil {
-			return err
+		if !scanner.Scan() {
+			return scanner.Err()
 		}
 	}
 
 	return nil
+}
+
+func runSavePhase(session *model.QuizSession) error {
+	shouldSave, err := askIfQuestionsShouldBeSaved()
+
+	if err != nil {
+		return err
+	}
+
+	if !shouldSave {
+		return nil
+	}
+
+	questionIndices, shouldQuit, err := askForQuestionsToSave(session)
+
+	if err != nil {
+		return err
+	}
+
+	if shouldQuit {
+		return nil
+	}
+
+	chosenQuestions := make([]model.QuizSessionItem, len(questionIndices))
+
+	for i, idx := range questionIndices {
+		chosenQuestions[i] = session.Items[idx]
+	}
+
+	path, err := askForPath()
+
+	if err != nil {
+		return err
+	}
+
+	return storage.SaveQuizItems(path, chosenQuestions)
+}
+
+func askIfQuestionsShouldBeSaved() (bool, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		fmt.Println("Would you like to save questions to a separate file (y/n)?")
+
+		if !scanner.Scan() {
+			return false, scanner.Err()
+		}
+
+		answer := strings.TrimSpace(scanner.Text())
+
+		switch strings.ToLower(answer) {
+		case "y":
+			return true, nil
+		case "n":
+			return false, nil
+		default:
+			fmt.Println("Provide valid answer.")
+		}
+	}
+}
+
+func askForPath() (string, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		fmt.Println("Enter the path:")
+
+		if !scanner.Scan() {
+			return "", scanner.Err()
+		}
+
+		path := strings.TrimSpace(scanner.Text())
+
+		if path == "" {
+			fmt.Println("Provide a valid file path.")
+			continue
+		}
+
+		return path, nil
+	}
+}
+
+func askForQuestionsToSave(session *model.QuizSession) ([]int, bool, error) {
+	chosenQuestionIndices := make(map[int]struct{})
+
+	for {
+		showStatus(session, chosenQuestionIndices)
+		fmt.Println()
+		selectionRange, shouldQuit, shouldProceed, err := askForRange()
+
+		if err != nil {
+			return nil, false, err
+		}
+
+		if shouldQuit {
+			return []int{}, true, err
+		}
+
+		toggleSelection(session, chosenQuestionIndices, selectionRange)
+
+		if shouldProceed {
+			if len(chosenQuestionIndices) == 0 {
+				fmt.Println("No questions to save.")
+				return []int{}, true, nil
+			}
+
+			break
+		}
+	}
+
+	indices := make([]int, 0, len(chosenQuestionIndices))
+
+	for idx := range chosenQuestionIndices {
+		indices = append(indices, idx)
+	}
+
+	return indices, false, nil
+}
+
+func askForRange() (ranges.RangeQuery, bool, bool, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		fmt.Println("Enter range (f to finish, q to quit):")
+
+		if !scanner.Scan() {
+			return ranges.RangeQuery{}, false, false, scanner.Err()
+		}
+
+		answer := strings.TrimSpace(scanner.Text())
+
+		if answer == "" {
+			fmt.Println("Provide a valid request.")
+			continue
+		}
+
+		switch strings.ToLower(answer) {
+		case "q":
+			return ranges.RangeQuery{}, true, false, nil
+		case "f":
+			return ranges.RangeQuery{}, false, true, nil
+		}
+
+		parsedRange, err := ranges.ParseRange(answer)
+
+		if err != nil {
+			fmt.Println("Provide a valid range.")
+			continue
+		}
+
+		return parsedRange, false, false, nil
+	}
+}
+
+func showStatus(session *model.QuizSession, chosenIndices map[int]struct{}) {
+	for i, item := range session.Items {
+		var selected string
+
+		if _, ok := chosenIndices[i]; ok {
+			selected = "+"
+		} else {
+			selected = " "
+		}
+
+		question := ""
+
+		for line := range strings.Lines(item.Question) {
+			question = strings.TrimSuffix(line, "\n")
+			break
+		}
+
+		runes := []rune(question)
+
+		if len(runes) > 50 {
+			runes = runes[:50]
+			question = string(runes) + "{...}"
+		}
+
+		fmt.Printf("%v [%v] %v\n", selected, i, question)
+	}
+}
+
+func toggleSelection(
+	session *model.QuizSession,
+	chosenIndices map[int]struct{},
+	selectionRange ranges.RangeQuery,
+) {
+	for _, rangePart := range selectionRange.Parts {
+		left := rangePart.OpenIndex
+
+		var right int
+
+		if rangePart.CloseIndex == -1 {
+			right = len(session.Items)
+		} else {
+			right = rangePart.CloseIndex
+		}
+
+		for left < right {
+			if _, ok := chosenIndices[left]; !ok {
+				if left < len(session.Items) {
+					chosenIndices[left] = struct{}{}
+				}
+			} else {
+				delete(chosenIndices, left)
+			}
+			left++
+		}
+	}
 }
