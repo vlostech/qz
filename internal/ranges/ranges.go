@@ -33,7 +33,8 @@ func ParseRange(rangeStr string) (RangeQuery, error) {
 		rangeStr = ".."
 	}
 
-	parts := strings.Split(rangeStr, ",")
+	strWithoutSpaces := strings.ReplaceAll(rangeStr, " ", "")
+	parts := strings.Split(strWithoutSpaces, ",")
 	rangeParts := make([][2]int, len(parts))
 
 	for i, part := range parts {
