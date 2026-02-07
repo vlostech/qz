@@ -31,7 +31,7 @@ const (
 // In example above, GetQuizItems returns two model.QuizSessionItem. The second item contains the question that consists
 // of two rows.
 func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
-	file, err := os.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
 
 	if err != nil {
 		return nil, err
