@@ -3,12 +3,13 @@ package storage
 import (
 	"bufio"
 	"fmt"
-	"github.com/vlostech/qz/internal/model"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/vlostech/qz/internal/model"
 )
 
 const (
