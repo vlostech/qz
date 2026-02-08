@@ -50,14 +50,16 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 }
 
 // SaveQuizItems saves questions to the given file. If the file does not exist, it will be created. If the file already
-// exists, questions will be added to the end of the file.
-func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) error {
+// exists, questions will be added to the end of the file. Returns an absolute path of the file.
+func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, error) {
 	p, err := getAbsolutePath(filePath)
+
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	file, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+
 	defer func() {
 		closeErr := file.Close()
 		if closeErr != nil {
@@ -66,7 +68,7 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) error {
 	}()
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	builder := strings.Builder{}
@@ -81,10 +83,10 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) error {
 	_, err = file.Write([]byte(builder.String()))
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return p, nil
 }
 
 func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {

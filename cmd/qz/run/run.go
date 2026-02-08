@@ -166,7 +166,17 @@ func runSavePhase(session *model.QuizSession) error {
 		return err
 	}
 
-	return storage.SaveQuizItems(path, chosenQuestions)
+	absolutePath, err := storage.SaveQuizItems(path, chosenQuestions)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("Questions are saved in the following file:")
+	fmt.Println(absolutePath)
+
+	return nil
 }
 
 func askIfQuestionsShouldBeSaved() (bool, error) {
