@@ -254,7 +254,7 @@ func askForRange() (ranges.RangeQuery, bool, bool, error) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
-		fmt.Println("Enter range (f to finish, q to quit):")
+		fmt.Println("Choose questions or enter command (f, q, ?):")
 
 		if !scanner.Scan() {
 			return ranges.RangeQuery{}, false, false, scanner.Err()
@@ -272,6 +272,9 @@ func askForRange() (ranges.RangeQuery, bool, bool, error) {
 			return ranges.RangeQuery{}, true, false, nil
 		case "f":
 			return ranges.RangeQuery{}, false, true, nil
+		case "?":
+			showHelpForRange()
+			return ranges.RangeQuery{}, false, false, nil
 		}
 
 		parsedRange, err := ranges.ParseRange(answer)
@@ -285,7 +288,31 @@ func askForRange() (ranges.RangeQuery, bool, bool, error) {
 	}
 }
 
+func showHelpForRange() {
+	const str = "Available commands:\n\n" +
+		"f - Finish\n" +
+		"q - Quit\n" +
+		"? - Show this help\n\n" +
+		"You can control selection using the following features:\n\n" +
+		"1. Type N to select the corresponding element (N is an element number).\n\n" +
+		"   Example: 42 (selects the element 42)\n\n" +
+		"2. Type N..M to select elements from N to M inclusive.\n\n" +
+		"   Example: 5..10 (selects the elements 5, 6, 7, 8, 9, and 10)\n\n" +
+		"3. Type N.. to select N and all elements after.\n\n" +
+		"   Example: 5.. (selects the element 5 and all elements after)\n\n" +
+		"4. Type ..N to select all elements before N inclusive.\n\n" +
+		"   Example: ..5 (selects the elements 1, 2, 3, 4, and 5)\n\n" +
+		"5. Type .. to select all elements.\n\n" +
+		"6. You can combine multiple expressions separated by a comma.\n\n" +
+		"   Example: ..10, 20, 30..40, 50..\n\n" +
+		"7. Select the same element twice to deselect it.\n\n"
+
+	fmt.Print(str)
+}
+
 func showStatus(session *model.QuizSession, chosenIndices map[int]struct{}) {
+	fmt.Println("Questions:")
+
 	for i, item := range session.Items {
 		var selected string
 
