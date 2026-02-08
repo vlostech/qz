@@ -333,7 +333,7 @@ func showStatus(session *model.QuizSession, chosenIndices map[int]struct{}) {
 
 		if len(runes) > 50 {
 			runes = runes[:50]
-			question = string(runes) + "{...}"
+			question = string(runes) + "..."
 		}
 
 		fmt.Printf("%v [%v] %v\n", selected, i, question)
