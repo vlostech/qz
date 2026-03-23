@@ -59,15 +59,25 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 // exists, questions will be added to the end of the file. Returns an absolute path of the file. Returns
 // ErrInvalidFilePath if the given file path is invalid.
 func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, error) {
-	p, err := getAbsolutePath(filePath)
+	absFilePath, err := getAbsolutePath(filePath)
 
 	if err != nil {
 		return "", err
 	}
 
-	file, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	err = createMissingDirectoriesForFile(absFilePath)
 
 	var pathErr *fs.PathError
+
+	if err != nil {
+		if errors.As(err, &pathErr) {
+			return "", ErrInvalidFilePath
+		}
+
+		return "", err
+	}
+
+	file, err := os.OpenFile(absFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 
 	if errors.As(err, &pathErr) {
 		return "", ErrInvalidFilePath
@@ -99,7 +109,7 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 		return "", err
 	}
 
-	return p, nil
+	return absFilePath, nil
 }
 
 func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
@@ -183,4 +193,14 @@ func getAbsolutePath(filePath string) (string, error) {
 	}
 
 	return filepath.Abs(filePath)
+}
+
+func createMissingDirectoriesForFile(filePath string) error {
+	dirPath := filepath.Dir(filePath)
+
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		return os.MkdirAll(dirPath, 0644)
+	}
+
+	return nil
 }
