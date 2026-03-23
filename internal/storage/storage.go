@@ -2,8 +2,10 @@ package storage
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +17,10 @@ import (
 const (
 	questionPart = 1
 	answerPart   = 2
+)
+
+var (
+	ErrInvalidFilePath = errors.New("invalid file path")
 )
 
 // GetQuizItems returns all pairs of questions and answers from a given file.
@@ -50,7 +56,8 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 }
 
 // SaveQuizItems saves questions to the given file. If the file does not exist, it will be created. If the file already
-// exists, questions will be added to the end of the file. Returns an absolute path of the file.
+// exists, questions will be added to the end of the file. Returns an absolute path of the file. Returns
+// ErrInvalidFilePath if the given file path is invalid.
 func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, error) {
 	p, err := getAbsolutePath(filePath)
 
@@ -59,6 +66,12 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 	}
 
 	file, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+
+	var pathErr *fs.PathError
+
+	if errors.As(err, &pathErr) {
+		return "", ErrInvalidFilePath
+	}
 
 	defer func() {
 		closeErr := file.Close()

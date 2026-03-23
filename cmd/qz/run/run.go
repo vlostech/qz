@@ -2,6 +2,7 @@ package run
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -160,16 +161,27 @@ func runSavePhase(session *model.QuizSession) error {
 		chosenQuestions[i] = session.Items[idx]
 	}
 
-	path, err := askForPath()
+	var absolutePath string
 
-	if err != nil {
-		return err
-	}
+	for {
+		path, err := askForPath()
 
-	absolutePath, err := storage.SaveQuizItems(path, chosenQuestions)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
+		absolutePath, err = storage.SaveQuizItems(path, chosenQuestions)
+
+		if err != nil {
+			if errors.Is(err, storage.ErrInvalidFilePath) {
+				fmt.Println("ERROR: Provided path is invalid.")
+				continue
+			}
+
+			return err
+		}
+
+		break
 	}
 
 	fmt.Println()
@@ -206,7 +218,7 @@ func askForPath() (string, error) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
-		fmt.Println("Enter the path:")
+		fmt.Println("Enter a file path:")
 
 		if !scanner.Scan() {
 			return "", scanner.Err()
