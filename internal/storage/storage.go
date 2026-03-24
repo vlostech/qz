@@ -114,6 +114,7 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 
 func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 	curPart := questionPart
+	isPreviousLineEmpty := true
 
 	scanner := bufio.NewScanner(r)
 
@@ -129,11 +130,16 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 		case questionPart:
 			{
 				if text == "" {
+					if isPreviousLineEmpty {
+						continue
+					}
+
 					if curQuizItem == nil {
 						continue
 					}
 
 					curPart = answerPart
+					isPreviousLineEmpty = true
 				} else {
 					if curQuizItem == nil {
 						curQuizItem = &model.QuizSessionItem{
@@ -143,6 +149,8 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 					} else {
 						curQuizItem.Question += "\n" + text
 					}
+
+					isPreviousLineEmpty = false
 				}
 			}
 		case answerPart:
@@ -152,26 +160,35 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 				}
 
 				if text == "" {
+					if isPreviousLineEmpty {
+						continue
+					}
+
 					if curQuizItem.ExpectedAnswer == "" {
 						continue
-					} else {
-						quizItems = append(quizItems, *curQuizItem)
-						curQuizItem = nil
-						idx++
-						curPart = questionPart
 					}
+
+					quizItems = append(quizItems, *curQuizItem)
+					curQuizItem = nil
+					idx++
+					curPart = questionPart
+					isPreviousLineEmpty = true
 				} else {
 					if curQuizItem.ExpectedAnswer == "" {
 						curQuizItem.ExpectedAnswer = text
 					} else {
 						curQuizItem.ExpectedAnswer += "\n" + text
 					}
+
+					isPreviousLineEmpty = false
 				}
 			}
 		}
 	}
 
-	quizItems = append(quizItems, *curQuizItem)
+	if curQuizItem != nil {
+		quizItems = append(quizItems, *curQuizItem)
+	}
 
 	return quizItems, nil
 }
