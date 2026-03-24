@@ -94,12 +94,34 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 		return "", err
 	}
 
-	builder := strings.Builder{}
+	existingQuizItems, err := extractQuizItems(file)
+
+	if err != nil {
+		return "", err
+	}
+
+	m := make(map[string]bool)
+
+	for _, existingQuizItem := range existingQuizItems {
+		m[existingQuizItem.Question] = true
+	}
+
+	var newQuizItems []model.QuizSessionItem
 
 	for _, quizItem := range quizItems {
-		builder.WriteString(quizItem.Question)
+		if m[quizItem.Question] {
+			continue
+		}
+
+		newQuizItems = append(newQuizItems, quizItem)
+	}
+
+	builder := strings.Builder{}
+
+	for _, newQuizItem := range newQuizItems {
+		builder.WriteString(newQuizItem.Question)
 		builder.WriteString("\n\n")
-		builder.WriteString(quizItem.ExpectedAnswer)
+		builder.WriteString(newQuizItem.ExpectedAnswer)
 		builder.WriteString("\n\n")
 	}
 
