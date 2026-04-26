@@ -52,7 +52,15 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 		_ = file.Close()
 	}()
 
-	return extractQuizItems(file)
+	scanner := bufio.NewScanner(file)
+
+	var lines []string
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	return extractQuizItems(lines)
 }
 
 // SaveQuizItems saves questions to the given file. If the file does not exist, it will be created. If the file already
@@ -94,7 +102,18 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 		return "", err
 	}
 
-	existingQuizItems, err := extractQuizItems(file)
+	fileBytes, err := io.ReadAll(file)
+
+	if err != nil {
+		return "", err
+	}
+
+	fileText := string(fileBytes)
+
+	lineBreak := getLineBreakForFileText(fileText)
+	lines := strings.Split(fileText, lineBreak)
+
+	existingQuizItems, err := extractQuizItems(lines)
 
 	if err != nil {
 		return "", err
@@ -118,11 +137,28 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 
 	builder := strings.Builder{}
 
-	for _, newQuizItem := range newQuizItems {
-		builder.WriteString(newQuizItem.Question)
-		builder.WriteString("\n\n")
-		builder.WriteString(newQuizItem.ExpectedAnswer)
-		builder.WriteString("\n\n")
+	// This block appends additional line breaks to the end of the current file to make sure that
+	// existing content will be separated from the new content:
+	//
+	// * If the last line of the file contains text, then we add two line breaks to the end of the
+	//   line.
+	//
+	// * If the last line is empty, but the line above has text, then we add one line break.
+	if len(lines) > 0 && lines[len(lines)-1] != "" {
+		builder.WriteString(lineBreak + lineBreak)
+	} else if len(lines) > 1 && lines[len(lines)-2] != "" {
+		builder.WriteString(lineBreak)
+	}
+
+	for i, newQuizItem := range newQuizItems {
+		builder.WriteString(strings.ReplaceAll(newQuizItem.Question, "\n", lineBreak))
+		builder.WriteString(lineBreak + lineBreak)
+		builder.WriteString(strings.ReplaceAll(newQuizItem.ExpectedAnswer, "\n", lineBreak))
+
+		// Adds line breaks only between question-answer pairs.
+		if i < len(newQuizItems)-1 {
+			builder.WriteString(lineBreak + lineBreak)
+		}
 	}
 
 	_, err = file.Write([]byte(builder.String()))
@@ -134,24 +170,20 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 	return absFilePath, nil
 }
 
-func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
+func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
 	curPart := questionPart
 	isPreviousLineEmpty := true
-
-	scanner := bufio.NewScanner(r)
 
 	var quizItems []model.QuizSessionItem
 	var curQuizItem *model.QuizSessionItem
 
 	idx := 0
 
-	for scanner.Scan() {
-		text := scanner.Text()
-
+	for _, line := range lines {
 		switch curPart {
 		case questionPart:
 			{
-				if text == "" {
+				if line == "" {
 					if isPreviousLineEmpty {
 						continue
 					}
@@ -166,10 +198,10 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 					if curQuizItem == nil {
 						curQuizItem = &model.QuizSessionItem{
 							Index:    idx,
-							Question: text,
+							Question: line,
 						}
 					} else {
-						curQuizItem.Question += "\n" + text
+						curQuizItem.Question += "\n" + line
 					}
 
 					isPreviousLineEmpty = false
@@ -181,7 +213,7 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 					panic("quizItem was not initialized")
 				}
 
-				if text == "" {
+				if line == "" {
 					if isPreviousLineEmpty {
 						continue
 					}
@@ -197,9 +229,9 @@ func extractQuizItems(r io.Reader) ([]model.QuizSessionItem, error) {
 					isPreviousLineEmpty = true
 				} else {
 					if curQuizItem.ExpectedAnswer == "" {
-						curQuizItem.ExpectedAnswer = text
+						curQuizItem.ExpectedAnswer = line
 					} else {
-						curQuizItem.ExpectedAnswer += "\n" + text
+						curQuizItem.ExpectedAnswer += "\n" + line
 					}
 
 					isPreviousLineEmpty = false
@@ -242,4 +274,18 @@ func createMissingDirectoriesForFile(filePath string) error {
 	}
 
 	return nil
+}
+
+func getLineBreakForFileText(fileText string) string {
+	for _, char := range fileText {
+		if char == '\r' {
+			return "\r\n"
+		}
+
+		if char == '\n' {
+			return "\n"
+		}
+	}
+
+	return "\n"
 }
