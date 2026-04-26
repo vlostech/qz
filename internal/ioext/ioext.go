@@ -12,7 +12,11 @@ func GetMultilineString() (string, error) {
 
 	var strList []string
 
-	for scanner.Scan() {
+	for {
+		if !scanner.Scan() {
+			return "", scanner.Err()
+		}
+
 		line := scanner.Text()
 
 		if line == "\\end" {

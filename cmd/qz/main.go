@@ -1,9 +1,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/vlostech/qz/cmd/qz/run"
-	"os"
 )
 
 var rootCmd = &cobra.Command{
