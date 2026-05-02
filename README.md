@@ -1,14 +1,19 @@
 # qz
 
+`qz` is a command line tool for self-education that provides a simple way of testing knowledge.
+
+> [!IMPORTANT]
+> At the moment the tool is under development and requires Go to be installed.
+
 ## Getting Started
 
-1. Install the program using the following command (Go is required):
+Step 1 – Install the program using the following command (Go is required):
 
 ```sh
 go install github.com/vlostech/qz/cmd/qz@latest
 ```
 
-2. Prepare a file with questions and answers. All answers and questions should be separated by an empty line.
+Step 2 – Prepare a file with questions and answers. An empty line should separate all answers and questions.
 
 ```
 Question 1
@@ -20,7 +25,7 @@ Question 2
 Answer 2
 ```
 
-3. Run the program for the prepared file.
+Step 3 – Run the program for the prepared file.
 
 ```sh
 qz run -f ~/test.txt
@@ -46,7 +51,7 @@ qz run -f ~/test.txt -c 10 -r ..10,15,20,30..40,50..
 
 If `test.txt` contains 100 questions, the example above takes 72 questions and runs a session with 10 random questions.
 
-## Input
+## Input features
 
 When answering a question, you can use `\` character at the end of a line to add another line.
 
@@ -64,3 +69,27 @@ You can also use `\end` command at the beginning of a line to discard the curren
 > Last row\
 > \end
 ```
+
+## Saving questions to a file
+
+After your session is finished, you will be asked to save questions to a file.
+You can choose questions from the session that you want to save using the same
+range syntax as explained above. When all necessary questions are chosen, you
+can proceed to provide a file path.
+
+You can type a file path in different ways:
+
+* Absolute path. File path starts with `/` (or `{volume}:\` for Windows}). For
+  example, `/foo/bar.txt` (or `D:\foo\bar.txt` for Windows).
+
+* Relative path to working directory. File path starts with a file name or a
+  directory name. For example, `foo/bar.txt` means `{WORKDIR}/foo/bar.txt`.
+
+* Relative path to home directory. File path starts with `~`. For example,
+  `~/foo/bar.txt` means `{HOMEDIR}/foo/bar.txt`.
+
+If an existing file is provided, questions will be appended to the file. All
+duplicate questions will be skipped.
+
+If the file does not exist, it will be created. All missing directories in the
+file path will be created.

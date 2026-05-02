@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/vlostech/qz/internal/domain"
 )
 
-// ParseRange parses a given string and converts it into RangeQuery model.
+// Parse parses a given string and converts it into domain.RangeQuery model.
 //
 // Supported patterns:
 //
@@ -16,31 +18,35 @@ import (
 //	"5.."   - From 5 to the end.
 //	"5..10" - From 5 to 10 (exclusively).
 //
-// ParseRange supports multiple ranges that are separated by ',' (comma). If two ranges overlap each other, they will
-// be merged.
+// Parse supports multiple ranges that are separated by ',' (comma). If two
+// ranges overlap each other, they will be merged.
 //
 // Example:
 //
-//	"..10,5..20,15.." -> ".."
+//	"..10, 5..20, 15.." -> ".."
 //
-//	Explanation:
-//	- "..10" and "5..20" has common elements (5, 6, ..., 9) and will be merged into "..20".
-//	- "..20" and "15.." also has common elements (15, 16, ..., 19) and will be merged into "..".
+// Explanation for the example above:
+//
+//   - "..10" and "5..20" have common elements (5, 6, ..., 9) and will be merged
+//     into "..20".
+//   - "..20" and "15.." also have common elements (15, 16, ..., 19) and will be
+//     merged into "..".
 //
 // An empty string ("") is interpreted as "..".
-func ParseRange(rangeStr string) (RangeQuery, error) {
+func Parse(rangeStr string) (domain.RangeQuery, error) {
 	if rangeStr == "" {
 		rangeStr = ".."
 	}
 
-	parts := strings.Split(rangeStr, ",")
+	strWithoutSpaces := strings.ReplaceAll(rangeStr, " ", "")
+	parts := strings.Split(strWithoutSpaces, ",")
 	rangeParts := make([][2]int, len(parts))
 
 	for i, part := range parts {
 		rangePart, err := parseRangePart(part)
 
 		if err != nil {
-			return RangeQuery{}, err
+			return domain.RangeQuery{}, err
 		}
 
 		rangeParts[i] = rangePart
@@ -49,12 +55,22 @@ func ParseRange(rangeStr string) (RangeQuery, error) {
 	outputRange, err := buildRange(rangeParts)
 
 	if err != nil {
-		return RangeQuery{}, err
+		return domain.RangeQuery{}, err
 	}
 
 	return outputRange, nil
 }
 
+// parseRangePart parses a single range part represented by a string and turns
+// it into an array with open and close indices:
+//
+// Examples:
+//
+//	".."    -> [0, -1]
+//	"5"     -> [5, 5]
+//	"..5"   -> [0, 5]
+//	"5.."   -> [5, -1]
+//	"5..10" -> [5, 10]
 func parseRangePart(partString string) ([2]int, error) {
 	if partString == ".." {
 		return [2]int{0, -1}, nil
@@ -68,7 +84,7 @@ func parseRangePart(partString string) ([2]int, error) {
 			return [2]int{}, err
 		}
 
-		return [2]int{0, closeIndex}, nil
+		return [2]int{0, closeIndex + 1}, nil
 	}
 
 	if strings.HasSuffix(partString, "..") {
@@ -97,7 +113,7 @@ func parseRangePart(partString string) ([2]int, error) {
 			return [2]int{}, err
 		}
 
-		return [2]int{openIndex, closeIndex}, nil
+		return [2]int{openIndex, closeIndex + 1}, nil
 	}
 
 	index, err := getValue(partString)
@@ -106,9 +122,10 @@ func parseRangePart(partString string) ([2]int, error) {
 		return [2]int{}, err
 	}
 
-	return [2]int{index, index}, nil
+	return [2]int{index, index + 1}, nil
 }
 
+// getValue extracts an integer value from str and validates it.
 func getValue(str string) (int, error) {
 	val, err := strconv.Atoi(str)
 
@@ -123,7 +140,8 @@ func getValue(str string) (int, error) {
 	return val, nil
 }
 
-func buildRange(parts [][2]int) (RangeQuery, error) {
+// buildRange constructs a [domain.RangeQuery] from a slice of integer ranges.
+func buildRange(parts [][2]int) (domain.RangeQuery, error) {
 	buf := make([][2]int, len(parts))
 	copy(buf, parts)
 
@@ -134,10 +152,10 @@ func buildRange(parts [][2]int) (RangeQuery, error) {
 
 		for i := 0; i+1 < len(buf); i++ {
 			for j := i + 1; j < len(buf); j++ {
-				mergeResult := tryMerge(buf[i], buf[j])
+				isMerged, mergedRange := tryMerge(buf[i], buf[j])
 
-				if len(mergeResult) == 1 {
-					buf[i] = mergeResult[0]
+				if isMerged {
+					buf[i] = mergedRange
 					buf[j] = buf[len(buf)-1]
 					buf = buf[:len(buf)-1]
 					shouldRepeat = true
@@ -146,12 +164,12 @@ func buildRange(parts [][2]int) (RangeQuery, error) {
 		}
 	}
 
-	rangeQuery := RangeQuery{
-		Parts: make([]RangeQueryPart, len(buf)),
+	rangeQuery := domain.RangeQuery{
+		Parts: make([]domain.RangeQueryPart, len(buf)),
 	}
 
 	for i, r := range buf {
-		rangeQuery.Parts[i] = RangeQueryPart{
+		rangeQuery.Parts[i] = domain.RangeQueryPart{
 			OpenIndex:  r[0],
 			CloseIndex: r[1],
 		}
@@ -160,9 +178,11 @@ func buildRange(parts [][2]int) (RangeQuery, error) {
 	return rangeQuery, nil
 }
 
-func tryMerge(first, second [2]int) [][2]int {
+// tryMerge attempts to merge two ranges if they are adjacent or overlapping.
+// For example, [1, 2] and [2, 3] will be merged into [1, 3].
+func tryMerge(first, second [2]int) (bool, [2]int) {
 	if !shouldMerge(first, second) {
-		return [][2]int{first, second}
+		return false, [2]int{}
 	}
 
 	var minLeft int
@@ -183,16 +203,18 @@ func tryMerge(first, second [2]int) [][2]int {
 	}
 
 	if first[0] == first[1] && second[0] == second[1] {
-		return [][2]int{{minLeft, maxRight + 1}}
+		return true, [2]int{minLeft, maxRight + 1}
 	} else if first[0] == first[1] && first[0] == maxRight {
-		return [][2]int{{minLeft, maxRight + 1}}
+		return true, [2]int{minLeft, maxRight + 1}
 	} else if second[0] == second[1] && second[0] == maxRight {
-		return [][2]int{{minLeft, maxRight + 1}}
+		return true, [2]int{minLeft, maxRight + 1}
 	}
 
-	return [][2]int{{minLeft, maxRight}}
+	return true, [2]int{minLeft, maxRight}
 }
 
+// shouldMerge checks if two ranges can be merged into a single range. For
+// example, [1, 2] and [2, 3] can be merged into [1, 3].
 func shouldMerge(first, second [2]int) bool {
 	if first[0] == first[1] && second[0] == second[1] {
 		delta := first[0] - second[0]
@@ -202,10 +224,10 @@ func shouldMerge(first, second [2]int) bool {
 	if first[1] == -1 || first[1] >= second[0] {
 		if second[1] == -1 || first[0] <= second[1] {
 			return true
-		} else {
-			return false
 		}
-	} else {
+
 		return false
 	}
+
+	return false
 }
