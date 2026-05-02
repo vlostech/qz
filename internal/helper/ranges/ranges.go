@@ -84,7 +84,7 @@ func parseRangePart(partString string) ([2]int, error) {
 			return [2]int{}, err
 		}
 
-		return [2]int{0, closeIndex + 1}, nil
+		return [2]int{0, closeIndex}, nil
 	}
 
 	if strings.HasSuffix(partString, "..") {
@@ -113,7 +113,7 @@ func parseRangePart(partString string) ([2]int, error) {
 			return [2]int{}, err
 		}
 
-		return [2]int{openIndex, closeIndex + 1}, nil
+		return [2]int{openIndex, closeIndex}, nil
 	}
 
 	index, err := getValue(partString)
@@ -122,7 +122,7 @@ func parseRangePart(partString string) ([2]int, error) {
 		return [2]int{}, err
 	}
 
-	return [2]int{index, index + 1}, nil
+	return [2]int{index, index}, nil
 }
 
 // getValue extracts an integer value from str and validates it.
