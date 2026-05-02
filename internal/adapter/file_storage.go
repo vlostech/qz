@@ -1,4 +1,4 @@
-package storage
+package adapter
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vlostech/qz/internal/model"
+	"github.com/vlostech/qz/internal/domain"
 )
 
 const (
@@ -23,10 +23,16 @@ var (
 	ErrInvalidFilePath = errors.New("invalid file path")
 )
 
-// GetQuizItems returns all pairs of questions and answers from a given file.
+type FileStorage struct{}
+
+func NewFileStorage() *FileStorage {
+	return &FileStorage{}
+}
+
+// GetItems returns all pairs of questions and answers from a given file.
 //
-// Any file should have alternating questions and answers (question goes first) that are separated by an empty line.
-// Both can have 1..* rows.
+// Any file should have alternating questions and answers (question goes first)
+// that are separated by an empty line. Both can have 1..* rows.
 //
 // Example:
 //
@@ -39,9 +45,9 @@ var (
 //
 //	Answer 2 - Row 1
 //
-// In example above, GetQuizItems returns two model.QuizSessionItem. The second item contains the question that consists
-// of two rows.
-func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
+// In the example above, GetQuizItems returns two domain.CollectionItem. The
+// second item contains the question that consists of two rows.
+func (s *FileStorage) GetItems(filePath string) ([]domain.CollectionItem, error) {
 	file, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
 
 	if err != nil {
@@ -60,20 +66,21 @@ func GetQuizItems(filePath string) ([]model.QuizSessionItem, error) {
 		lines = append(lines, scanner.Text())
 	}
 
-	return extractQuizItems(lines)
+	return s.extractQuizItems(lines)
 }
 
-// SaveQuizItems saves questions to the given file. If the file does not exist, it will be created. If the file already
-// exists, questions will be added to the end of the file. Returns an absolute path of the file. Returns
+// SaveQuizItems saves questions to the given file. If the file does not exist,
+// it will be created. If the file already exists, questions will be added to
+// the end of the file. Returns an absolute path of the file. Returns
 // ErrInvalidFilePath if the given file path is invalid.
-func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, error) {
-	absFilePath, err := getAbsolutePath(filePath)
+func (s *FileStorage) SaveQuizItems(filePath string, quizItems []domain.CollectionItem) (string, error) {
+	absFilePath, err := s.getAbsolutePath(filePath)
 
 	if err != nil {
 		return "", err
 	}
 
-	err = createMissingDirectoriesForFile(absFilePath)
+	err = s.createMissingDirectoriesForFile(absFilePath)
 
 	var pathErr *fs.PathError
 
@@ -110,10 +117,10 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 
 	fileText := string(fileBytes)
 
-	lineBreak := getLineBreakForFileText(fileText)
+	lineBreak := s.getLineBreakForFileText(fileText)
 	lines := strings.Split(fileText, lineBreak)
 
-	existingQuizItems, err := extractQuizItems(lines)
+	existingQuizItems, err := s.extractQuizItems(lines)
 
 	if err != nil {
 		return "", err
@@ -125,7 +132,7 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 		m[existingQuizItem.Question] = true
 	}
 
-	var newQuizItems []model.QuizSessionItem
+	var newQuizItems []domain.CollectionItem
 
 	for _, quizItem := range quizItems {
 		if m[quizItem.Question] {
@@ -137,13 +144,14 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 
 	builder := strings.Builder{}
 
-	// This block appends additional line breaks to the end of the current file to make sure that
-	// existing content will be separated from the new content:
+	// This block appends additional line breaks to the end of the file to make
+	// sure that the new content will be separated from the existing content.
 	//
-	// * If the last line of the file contains text, then we add two line breaks to the end of the
-	//   line.
+	// - If the last line of the file contains text, then we add two line breaks
+	//   to the end of the line.
 	//
-	// * If the last line is empty, but the line above has text, then we add one line break.
+	// - If the last line is empty, but the line above has text, then we add one
+	//   line break.
 	if len(lines) > 0 && lines[len(lines)-1] != "" {
 		builder.WriteString(lineBreak + lineBreak)
 	} else if len(lines) > 1 && lines[len(lines)-2] != "" {
@@ -153,7 +161,7 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 	for i, newQuizItem := range newQuizItems {
 		builder.WriteString(strings.ReplaceAll(newQuizItem.Question, "\n", lineBreak))
 		builder.WriteString(lineBreak + lineBreak)
-		builder.WriteString(strings.ReplaceAll(newQuizItem.ExpectedAnswer, "\n", lineBreak))
+		builder.WriteString(strings.ReplaceAll(newQuizItem.Answer, "\n", lineBreak))
 
 		// Adds line breaks only between question-answer pairs.
 		if i < len(newQuizItems)-1 {
@@ -170,12 +178,12 @@ func SaveQuizItems(filePath string, quizItems []model.QuizSessionItem) (string, 
 	return absFilePath, nil
 }
 
-func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
+func (s *FileStorage) extractQuizItems(lines []string) ([]domain.CollectionItem, error) {
 	curPart := questionPart
 	isPreviousLineEmpty := true
 
-	var quizItems []model.QuizSessionItem
-	var curQuizItem *model.QuizSessionItem
+	var quizItems []domain.CollectionItem
+	var curQuizItem *domain.CollectionItem
 
 	idx := 0
 
@@ -196,8 +204,7 @@ func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
 					isPreviousLineEmpty = true
 				} else {
 					if curQuizItem == nil {
-						curQuizItem = &model.QuizSessionItem{
-							Index:    idx,
+						curQuizItem = &domain.CollectionItem{
 							Question: line,
 						}
 					} else {
@@ -218,7 +225,7 @@ func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
 						continue
 					}
 
-					if curQuizItem.ExpectedAnswer == "" {
+					if curQuizItem.Answer == "" {
 						continue
 					}
 
@@ -228,10 +235,10 @@ func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
 					curPart = questionPart
 					isPreviousLineEmpty = true
 				} else {
-					if curQuizItem.ExpectedAnswer == "" {
-						curQuizItem.ExpectedAnswer = line
+					if curQuizItem.Answer == "" {
+						curQuizItem.Answer = line
 					} else {
-						curQuizItem.ExpectedAnswer += "\n" + line
+						curQuizItem.Answer += "\n" + line
 					}
 
 					isPreviousLineEmpty = false
@@ -247,7 +254,7 @@ func extractQuizItems(lines []string) ([]model.QuizSessionItem, error) {
 	return quizItems, nil
 }
 
-func getAbsolutePath(filePath string) (string, error) {
+func (s *FileStorage) getAbsolutePath(filePath string) (string, error) {
 	if filepath.IsAbs(filePath) {
 		return filePath, nil
 	}
@@ -266,7 +273,7 @@ func getAbsolutePath(filePath string) (string, error) {
 	return filepath.Abs(filePath)
 }
 
-func createMissingDirectoriesForFile(filePath string) error {
+func (s *FileStorage) createMissingDirectoriesForFile(filePath string) error {
 	dirPath := filepath.Dir(filePath)
 
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
@@ -276,7 +283,7 @@ func createMissingDirectoriesForFile(filePath string) error {
 	return nil
 }
 
-func getLineBreakForFileText(fileText string) string {
+func (s *FileStorage) getLineBreakForFileText(fileText string) string {
 	for _, char := range fileText {
 		if char == '\r' {
 			return "\r\n"

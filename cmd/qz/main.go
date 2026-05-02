@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/vlostech/qz/cmd/qz/run"
+	"github.com/vlostech/qz/internal/cli/run"
 )
 
 var rootCmd = &cobra.Command{

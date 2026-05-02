@@ -1,9 +1,15 @@
-package random
+package service
 
 import "math/rand"
 
+type RandomizationService struct{}
+
+func NewRandomizationService() *RandomizationService {
+	return &RandomizationService{}
+}
+
 // Randomize returns count numbers from nums in random order.
-func Randomize(nums []int, count int) []int {
+func (s *RandomizationService) Randomize(nums []int, count int) []int {
 	lastIndex := len(nums) - 1
 	leftIndexes := nums
 
