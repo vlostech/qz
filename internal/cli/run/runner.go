@@ -391,7 +391,7 @@ func (r *Runner) handleAnswerAboutSavingFile(state *sessionState, args stepArgs)
 		}, nil
 	}
 
-	fmt.Println("Provide valid answer.")
+	fmt.Println("ERROR: Provide a valid answer.")
 
 	return stepResult{
 		nextFunc:        r.askIfQuestionsShouldBeSavedToFile,
@@ -418,7 +418,7 @@ func (r *Runner) handleInputWithChosenQuestions(state *sessionState, args stepAr
 	answer := strings.TrimSpace(args.input)
 
 	if answer == "" {
-		fmt.Println("Provide a valid request.")
+		fmt.Println("ERROR: Provide a valid request.")
 
 		return stepResult{
 			nextFunc:        r.askForQuestionsForSaving,
@@ -447,7 +447,7 @@ func (r *Runner) handleInputWithChosenQuestions(state *sessionState, args stepAr
 	parsedRange, err := ranges.Parse(answer)
 
 	if err != nil {
-		fmt.Println("Provide a valid range.")
+		fmt.Println("ERROR: Provide a valid range.")
 
 		return stepResult{
 			nextFunc:        r.askForQuestionsForSaving,
@@ -503,7 +503,7 @@ func (r *Runner) handleInputWithFilePath(state *sessionState, args stepArgs) (st
 	path := strings.TrimSpace(args.input)
 
 	if path == "" {
-		fmt.Println("Provide a valid file path.")
+		fmt.Println("ERROR: Provide a valid file path.")
 
 		return stepResult{
 			nextFunc:        r.askForFilePath,
@@ -526,7 +526,7 @@ func (r *Runner) handleInputWithFilePath(state *sessionState, args stepArgs) (st
 
 	if err != nil {
 		if errors.Is(err, adapter.ErrInvalidFilePath) {
-			fmt.Println("Provide a valid file path.")
+			fmt.Println("ERROR: Provide a valid file path.")
 
 			return stepResult{
 				nextFunc:        r.askForFilePath,
