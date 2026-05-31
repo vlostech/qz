@@ -1,6 +1,7 @@
 # qz
 
-`qz` is a command line tool for self-education that provides a simple way of testing knowledge.
+`qz` is a command line tool for self-education that provides a simple way of
+testing knowledge.
 
 > [!IMPORTANT]
 > At the moment the tool is under development and requires Go to be installed.
@@ -13,7 +14,8 @@ Step 1 – Install the program using the following command (Go is required):
 go install github.com/vlostech/qz/cmd/qz@latest
 ```
 
-Step 2 – Prepare a file with questions and answers. An empty line should separate all answers and questions.
+Step 2 – Prepare a file with questions and answers. An empty line should
+separate all answers and questions.
 
 ```
 Question 1
@@ -31,9 +33,11 @@ Step 3 – Run the program for the prepared file.
 qz run -f ~/test.txt
 ```
 
-You can use `-c` (`--count`) flag to specify the number of questions in a session.
+You can use `-c` (`--count`) flag to specify the number of questions in a
+session.
 
-You can also use `-r` (`--range`) flag to specify the range of questions that will be used in a session.
+You can also use `-r` (`--range`) flag to specify the range of questions that
+will be used in a session.
 
 | Example | Description                                        |
 | ------- | -------------------------------------------------- |
@@ -49,11 +53,13 @@ You are able to specify multiple ranges that are separated by `,`.
 qz run -f ~/test.txt -c 10 -r ..10,15,20,30..40,50..
 ```
 
-If `test.txt` contains 100 questions, the example above takes 72 questions and runs a session with 10 random questions.
+If `test.txt` contains 100 questions, the example above takes 72 questions and
+runs a session with 10 random questions.
 
 ## Input features
 
-When answering a question, you can use `\` character at the end of a line to add another line.
+When answering a question, you can use `\` character at the end of a line to add
+another line.
 
 ```
 > First row\
@@ -61,7 +67,8 @@ When answering a question, you can use `\` character at the end of a line to add
 > Last row
 ```
 
-You can also use `\end` command at the beginning of a line to discard the current line.
+You can also use `\end` command at the beginning of a line to discard the
+current line.
 
 ```
 > First row\

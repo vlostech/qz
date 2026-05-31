@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/vlostech/qz/internal/adapter"
@@ -106,7 +107,15 @@ func (r *Runner) showNextQuestion(state *sessionState, args stepArgs) (stepResul
 	fmt.Println()
 	fmt.Println(state.quizSession.SessionItems[state.questionIdx].CollectionItem.Question)
 	fmt.Println()
-	fmt.Println("Write your answer:")
+
+	// Show current answer if exists.
+	if !r.isStringEmpty(state.quizSession.SessionItems[state.questionIdx].ActualAnswer) {
+		fmt.Println("Current answer:")
+		fmt.Println(state.quizSession.SessionItems[state.questionIdx].ActualAnswer)
+		fmt.Println()
+	}
+
+	fmt.Println("Write your answer or enter a command (/g, /f, /q, /?):")
 
 	return stepResult{
 		nextFunc:        r.handleAnswerToQuestion,
@@ -117,18 +126,190 @@ func (r *Runner) showNextQuestion(state *sessionState, args stepArgs) (stepResul
 func (r *Runner) handleAnswerToQuestion(state *sessionState, args stepArgs) (stepResult, error) {
 	fmt.Println()
 
-	state.quizSession.SessionItems[state.questionIdx].ActualAnswer = args.input
-	state.questionIdx++
+	if strings.HasPrefix(args.input, "/") {
+		commandWithArgs, err := r.getSubcommandArgs(args.input)
 
-	if state.questionIdx < len(state.quizSession.SessionItems) {
-		return stepResult{
-			nextFunc:        r.showNextQuestion,
-			isInputRequired: false,
-		}, nil
+		if err != nil {
+			fmt.Println("ERROR: Provide a valid command.")
+			fmt.Println()
+
+			return stepResult{
+				nextFunc:        r.showNextQuestion,
+				isInputRequired: false,
+			}, nil
+		}
+
+		switch commandWithArgs[0] {
+		case "/g", "/go":
+			if len(commandWithArgs) == 1 {
+				return stepResult{
+					nextFunc:        r.showQuestionsToNavigate,
+					isInputRequired: false,
+				}, nil
+			}
+
+			var questionNumber int
+			questionNumber, err = strconv.Atoi(commandWithArgs[1])
+
+			if err != nil {
+				fmt.Println("ERROR: /go command supports only integer arguments.")
+				fmt.Println()
+
+				return stepResult{
+					nextFunc:        r.showNextQuestion,
+					isInputRequired: false,
+				}, nil
+			}
+
+			state.questionIdx = questionNumber - 1
+
+			return stepResult{
+				nextFunc:        r.showNextQuestion,
+				isInputRequired: false,
+			}, nil
+
+		case "/f", "/finish":
+			state.questionIdx = 0
+
+			return stepResult{
+				nextFunc:        r.runPhaseWithAnswers,
+				isInputRequired: false,
+			}, nil
+
+		case "/q", "/quit":
+			return stepResult{
+				nextFunc:        nil,
+				isInputRequired: false,
+			}, nil
+
+		case "/?", "/help":
+			return stepResult{
+				nextFunc:        r.showHelpForAnsweringToQuestion,
+				isInputRequired: false,
+			}, nil
+
+		default:
+			fmt.Println("ERROR: Provide a valid command.")
+			fmt.Println()
+			return stepResult{
+				nextFunc:        r.showNextQuestion,
+				isInputRequired: false,
+			}, nil
+		}
+	}
+
+	state.quizSession.SessionItems[state.questionIdx].ActualAnswer = args.input
+
+	// When the current question is answered, we should move to the next
+	// unanswered question. First, we should show the next unanswered question
+	// after the current position. If there is no such question, we should show
+	// the next unanswered question before the current position.
+	//
+	// Example 1:
+	// [ ?, ?, ? ] -> [ ?, "foo", ? ]
+	//      ^                     ^
+	//
+	// Example 2:
+	// [ ?, ?, ?, "bar" ] -> [ ?, ?, "foo", "bar" ]
+	//         ^               ^
+
+	// Search for unanswered question after the current question.
+	for i := state.questionIdx + 1; i < len(state.quizSession.SessionItems); i++ {
+		if r.isStringEmpty(state.quizSession.SessionItems[i].ActualAnswer) {
+			state.questionIdx = i
+			return stepResult{
+				nextFunc:        r.showNextQuestion,
+				isInputRequired: false,
+			}, nil
+		}
+	}
+
+	// Search for unanswered question before the current question.
+	for i := 0; i < state.questionIdx; i++ {
+		if r.isStringEmpty(state.quizSession.SessionItems[i].ActualAnswer) {
+			state.questionIdx = i
+			return stepResult{
+				nextFunc:        r.showNextQuestion,
+				isInputRequired: false,
+			}, nil
+		}
 	}
 
 	return stepResult{
 		nextFunc:        r.runPhaseWithAnswers,
+		isInputRequired: false,
+	}, nil
+}
+
+func (r *Runner) showQuestionsToNavigate(state *sessionState, args stepArgs) (stepResult, error) {
+	builder := strings.Builder{}
+
+	for i, item := range state.quizSession.SessionItems {
+		answeredMark := " "
+
+		if item.ActualAnswer != "" {
+			answeredMark = "+"
+		}
+
+		question := r.getTrimmedString(item.CollectionItem.Question, 50)
+		builder.WriteString(fmt.Sprintf("%v [%v] %v\n", answeredMark, i+1, question))
+	}
+
+	fmt.Println(builder.String())
+	fmt.Println("Enter a question number:")
+
+	return stepResult{
+		nextFunc:        r.handleProvidedQuestionToNavigate,
+		isInputRequired: true,
+	}, nil
+}
+
+func (r *Runner) handleProvidedQuestionToNavigate(state *sessionState, args stepArgs) (stepResult, error) {
+	idx, err := strconv.Atoi(args.input)
+
+	fmt.Println()
+
+	if err != nil {
+		fmt.Println("ERROR: Provide a valid question number.")
+		fmt.Println()
+		fmt.Println("Enter a question number:")
+		return stepResult{
+			nextFunc:        r.handleProvidedQuestionToNavigate,
+			isInputRequired: true,
+		}, nil
+	}
+
+	if idx > len(state.quizSession.SessionItems) {
+		fmt.Println("ERROR: Question number out of range.")
+		fmt.Println()
+		fmt.Println("Enter a question number:")
+		return stepResult{
+			nextFunc:        r.handleProvidedQuestionToNavigate,
+			isInputRequired: true,
+		}, nil
+	}
+
+	state.questionIdx = idx - 1
+
+	return stepResult{
+		nextFunc:        r.showNextQuestion,
+		isInputRequired: false,
+	}, nil
+}
+
+func (r *Runner) showHelpForAnsweringToQuestion(state *sessionState, args stepArgs) (stepResult, error) {
+	const str = "Available commands:\n\n" +
+		"/go, /g       Go to question choosing it from the list.\n" +
+		"/go, /g {num} Go to question with the specified number 'num'.\n" +
+		"/finish, /f   Finish the current phase and go to answers.\n" +
+		"/quit, /q     Quit the program.\n" +
+		"/help, /?     Show this help."
+
+	fmt.Println(str)
+	fmt.Println()
+
+	return stepResult{
+		nextFunc:        r.showNextQuestion,
 		isInputRequired: false,
 	}, nil
 }
@@ -210,7 +391,7 @@ func (r *Runner) handleAnswerAboutSavingFile(state *sessionState, args stepArgs)
 		}, nil
 	}
 
-	fmt.Println("Provide valid answer.")
+	fmt.Println("ERROR: Provide a valid answer.")
 
 	return stepResult{
 		nextFunc:        r.askIfQuestionsShouldBeSavedToFile,
@@ -237,7 +418,7 @@ func (r *Runner) handleInputWithChosenQuestions(state *sessionState, args stepAr
 	answer := strings.TrimSpace(args.input)
 
 	if answer == "" {
-		fmt.Println("Provide a valid request.")
+		fmt.Println("ERROR: Provide a valid request.")
 
 		return stepResult{
 			nextFunc:        r.askForQuestionsForSaving,
@@ -266,7 +447,7 @@ func (r *Runner) handleInputWithChosenQuestions(state *sessionState, args stepAr
 	parsedRange, err := ranges.Parse(answer)
 
 	if err != nil {
-		fmt.Println("Provide a valid range.")
+		fmt.Println("ERROR: Provide a valid range.")
 
 		return stepResult{
 			nextFunc:        r.askForQuestionsForSaving,
@@ -322,7 +503,7 @@ func (r *Runner) handleInputWithFilePath(state *sessionState, args stepArgs) (st
 	path := strings.TrimSpace(args.input)
 
 	if path == "" {
-		fmt.Println("Provide a valid file path.")
+		fmt.Println("ERROR: Provide a valid file path.")
 
 		return stepResult{
 			nextFunc:        r.askForFilePath,
@@ -345,7 +526,7 @@ func (r *Runner) handleInputWithFilePath(state *sessionState, args stepArgs) (st
 
 	if err != nil {
 		if errors.Is(err, adapter.ErrInvalidFilePath) {
-			fmt.Println("Provide a valid file path.")
+			fmt.Println("ERROR: Provide a valid file path.")
 
 			return stepResult{
 				nextFunc:        r.askForFilePath,
@@ -378,19 +559,7 @@ func (r *Runner) showChosenQuestions(state *sessionState) string {
 			selected = " "
 		}
 
-		question := ""
-
-		for line := range strings.Lines(item.CollectionItem.Question) {
-			question = strings.TrimSuffix(line, "\n")
-			break
-		}
-
-		runes := []rune(question)
-
-		if len(runes) > 50 {
-			runes = runes[:50]
-			question = string(runes) + "..."
-		}
+		question := r.getTrimmedString(item.CollectionItem.Question, 50)
 
 		builder.WriteString(fmt.Sprintf("%v [%v] %v\n", selected, i, question))
 	}
@@ -449,4 +618,112 @@ func (r *Runner) getMultilineString() (string, error) {
 	}
 
 	return strings.Join(strList, "\n"), nil
+}
+
+// getSubcommandArgs extracts arguments from input. Supports quoted arguments.
+//
+//	foo bar baz -> [ "foo", "bar", "baz" ]
+//	foo "bar baz" -> [ "foo", "bar baz" ]
+func (r *Runner) getSubcommandArgs(input string) ([]string, error) {
+	// foo bar fiz baz -> [ "foo", "bar", "fiz", "baz" ]
+	// "foo bar" fiz baz -> [ "foo bar", "fiz", "baz" ]
+	// foo    bar "fiz    baz" -> [ "foo", "bar", "fiz    baz" ]
+	// "foo bar fiz baz -> error
+
+	var args []string
+
+	builder := strings.Builder{}
+
+	isArgumentActive := false
+	isStringArgument := false
+
+	for _, char := range input {
+		if char == ' ' {
+			if isArgumentActive {
+				if isStringArgument {
+					builder.WriteByte(' ')
+					continue
+				} else {
+					args = append(args, builder.String())
+					builder.Reset()
+					isArgumentActive = false
+					continue
+				}
+			} else {
+				continue
+			}
+		}
+
+		if char == '"' {
+			if isArgumentActive {
+				if isStringArgument {
+					args = append(args, builder.String())
+					builder.Reset()
+					isArgumentActive = false
+					isStringArgument = false
+					continue
+				} else {
+					return nil, errors.New("syntax error")
+				}
+			} else {
+				isArgumentActive = true
+				isStringArgument = true
+				continue
+			}
+		}
+
+		if !isArgumentActive {
+			isArgumentActive = true
+		}
+
+		builder.WriteRune(char)
+	}
+
+	if isArgumentActive {
+		if isStringArgument {
+			return nil, errors.New("syntax error")
+		}
+
+		args = append(args, builder.String())
+	}
+
+	return args, nil
+}
+
+// isStringEmpty determines if the given string is empty or consists only of
+// whitespace characters.
+func (r *Runner) isStringEmpty(str string) bool {
+	return strings.TrimSpace(str) == ""
+}
+
+// getTrimmedString trims the input string to the specified maxLen. Appends
+// "..." to the end of the string if it exceeds the max length. The length of
+// the output string does not exceed maxLen.
+//
+// Note that "..." requires 3 characters. If an input string is less or equal
+// 3, the string will be trimmed without an ellipsis.
+func (r *Runner) getTrimmedString(str string, maxLen int) string {
+	var output string
+
+	for line := range strings.Lines(str) {
+		output = strings.TrimSuffix(line, "\n")
+		break
+	}
+
+	var suffix string
+
+	if maxLen <= 3 {
+		suffix = ""
+	} else {
+		suffix = "..."
+	}
+
+	characters := []rune(output)
+
+	if len(characters) > maxLen {
+		characters = characters[:maxLen-len(suffix)]
+		output = string(characters) + suffix
+	}
+
+	return output
 }
