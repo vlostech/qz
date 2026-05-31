@@ -40,17 +40,17 @@ You can also use `-r` (`--range`) flag to specify the range of questions that
 will be used in a session.
 
 | Example | Description                                        |
-| ------- | -------------------------------------------------- |
+| ------- |----------------------------------------------------|
 | `5`     | Question by index 5.                               |
-| `..5`   | Questions from 0 inclusive to 5 exclusive.         |
+| `..5`   | Questions from 0 inclusive to 5 inclusive.         |
 | `5..`   | Questions from 5 inclusive to the end of the file. |
-| `5..10` | Questions from 5 inclusive to 10 exclusive.        |
+| `5..10` | Questions from 5 inclusive to 10 inclusive.        |
 | `..`    | All questions in the file.                         |
 
 You are able to specify multiple ranges that are separated by `,`.
 
 ```sh
-qz run -f ~/test.txt -c 10 -r ..10,15,20,30..40,50..
+qz run -f ~/test.txt -c 10 -r ..9,15,20,30..39,50..
 ```
 
 If `test.txt` contains 100 questions, the example above takes 72 questions and

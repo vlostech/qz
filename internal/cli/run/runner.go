@@ -567,19 +567,19 @@ func (r *Runner) showChosenQuestions(state *sessionState) string {
 	return builder.String()
 }
 
-func (r *Runner) toggleSelectedQuestions(state *sessionState, selectionRange domain.RangeQuery) {
-	for _, rangePart := range selectionRange.Parts {
-		left := rangePart.OpenIndex
+func (r *Runner) toggleSelectedQuestions(state *sessionState, selectionRange domain.RangeGroup) {
+	for _, rangePart := range selectionRange.Ranges {
+		left := rangePart.FirstIndex
 
 		var right int
 
-		if rangePart.CloseIndex == -1 {
+		if rangePart.LastIndex == -1 {
 			right = len(state.quizSession.SessionItems)
 		} else {
-			right = rangePart.CloseIndex
+			right = rangePart.LastIndex
 		}
 
-		for left < right {
+		for left <= right {
 			if _, ok := state.chosenIndices[left]; !ok {
 				if left < len(state.quizSession.SessionItems) {
 					state.chosenIndices[left] = struct{}{}
