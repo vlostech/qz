@@ -7,90 +7,91 @@ import (
 	"github.com/vlostech/qz/internal/domain"
 )
 
-func Test_ParseRange(t *testing.T) {
+func TestParseRange(t *testing.T) {
 	tests := []struct {
 		name     string
 		rangeStr string
-		want     domain.RangeQuery
+		want     domain.RangeGroup
 		wantErr  bool
 	}{
 		{
-			name:     "ReturnsFullRangeWhenEmptyStringProvided",
+			name:     "empty string",
 			rangeStr: "",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 0, CloseIndex: -1}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 0, LastIndex: -1}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsSingleRangeWhenSingleIndexProvided",
+			name:     "single index",
 			rangeStr: "42",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 42, CloseIndex: 43}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 42, LastIndex: 42}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsSingleRangeWhenConsecutiveNumbersProvided",
+			name:     "multiple adjacent indexes",
 			rangeStr: "5, 6, 7",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 5, CloseIndex: 8}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 5, LastIndex: 7}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsTwoRangesWhenGapBetweenNumbers",
-			rangeStr: "5, 6, 8",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{
-					{OpenIndex: 5, CloseIndex: 7},
-					{OpenIndex: 8, CloseIndex: 9},
+			name:     "multiple indexes with gaps",
+			rangeStr: "5, 7, 9",
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{
+					{FirstIndex: 5, LastIndex: 5},
+					{FirstIndex: 7, LastIndex: 7},
+					{FirstIndex: 9, LastIndex: 9},
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsFullRangeWhenTwoDotsProvided",
+			name:     "full range",
 			rangeStr: "..",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 0, CloseIndex: -1}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 0, LastIndex: -1}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsRangeWhenHalfOpenRangeFromIndexToEnd",
+			name:     "range without last index",
 			rangeStr: "42..",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 42, CloseIndex: -1}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 42, LastIndex: -1}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsRangeWhenHalfOpenRangeFromBeginningToIndex",
+			name:     "range without first index",
 			rangeStr: "..42",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 0, CloseIndex: 43}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 0, LastIndex: 42}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsRangeWhenSimpleRangeProvided",
+			name:     "range with both indexes",
 			rangeStr: "3..6",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{{OpenIndex: 3, CloseIndex: 7}},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{{FirstIndex: 3, LastIndex: 6}},
 			},
 			wantErr: false,
 		},
 		{
-			name:     "ReturnsMultipleRangesWhenComplexStringProvided",
+			name:     "multiple ranges",
 			rangeStr: "..10, 15, 20, 30..40, 50..",
-			want: domain.RangeQuery{
-				Parts: []domain.RangeQueryPart{
-					{OpenIndex: 0, CloseIndex: 11},
-					{OpenIndex: 15, CloseIndex: 16},
-					{OpenIndex: 20, CloseIndex: 21},
-					{OpenIndex: 30, CloseIndex: 41},
-					{OpenIndex: 50, CloseIndex: -1},
+			want: domain.RangeGroup{
+				Ranges: []domain.Range{
+					{FirstIndex: 0, LastIndex: 10},
+					{FirstIndex: 15, LastIndex: 15},
+					{FirstIndex: 20, LastIndex: 20},
+					{FirstIndex: 30, LastIndex: 40},
+					{FirstIndex: 50, LastIndex: -1},
 				},
 			},
 			wantErr: false,

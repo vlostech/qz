@@ -7,7 +7,7 @@ import (
 type CreateSessionInput struct {
 	FilePath   string
 	Count      int
-	RangeQuery domain.RangeQuery
+	RangeQuery domain.RangeGroup
 }
 
 type CreateSessionOutput struct {
@@ -55,17 +55,17 @@ func (u *UseCase) CreateSession(input CreateSessionInput) (CreateSessionOutput, 
 	return output, nil
 }
 
-func (u *UseCase) prepareIndexes(rangeQuery domain.RangeQuery, totalCount int) []int {
+func (u *UseCase) prepareIndexes(rangeQuery domain.RangeGroup, totalCount int) []int {
 	var indexes []int
 
-	if len(rangeQuery.Parts) != 0 {
-		for _, part := range rangeQuery.Parts {
-			if part.CloseIndex == -1 {
-				for i := part.OpenIndex; i < totalCount; i++ {
+	if len(rangeQuery.Ranges) != 0 {
+		for _, part := range rangeQuery.Ranges {
+			if part.LastIndex == -1 {
+				for i := part.FirstIndex; i < totalCount; i++ {
 					indexes = append(indexes, i)
 				}
 			} else {
-				for i := part.OpenIndex; i < part.CloseIndex; i++ {
+				for i := part.FirstIndex; i <= part.LastIndex; i++ {
 					if i == totalCount {
 						break
 					}
